@@ -54,8 +54,8 @@
     #include "USB_STM32L496VGT6P.h"
 
     #include "stm32l4xx.h"
+    #include "usbd_core.h"
     #include "usbd_def.h"
-// #include "usbd_cdc_if.h" // FIXME
 
 // #############################################################################
 // #### Private Macro(s) #######################################################
@@ -71,18 +71,18 @@
 typedef enum USB_STM32L496VGT6P_Event
 {
     USB_STM32L496VGT6P_Event_None = 0,
-    USB_STM32L496VGT6P_Event_TxComplete = UTIL_BIT( 0 ),
-    USB_STM32L496VGT6P_Event_RxComplete = UTIL_BIT( 1 ),
-    USB_STM32L496VGT6P_Event_AbortTxComplete = UTIL_BIT( 2 ),
-    USB_STM32L496VGT6P_Event_AbortRxComplete = UTIL_BIT( 3 ),
-    USB_STM32L496VGT6P_Event_AbortComplete = UTIL_BIT( 4 ),
-    USB_STM32L496VGT6P_Event_ErrorParity = UTIL_BIT( 5 ),
-    USB_STM32L496VGT6P_Event_ErrorNoise = UTIL_BIT( 6 ),
-    USB_STM32L496VGT6P_Event_ErrorFrame = UTIL_BIT( 7 ),
-    USB_STM32L496VGT6P_Event_ErrorOverrun = UTIL_BIT( 8 ),
-    USB_STM32L496VGT6P_Event_ErrorDMA = UTIL_BIT( 9 ),
-    USB_STM32L496VGT6P_Event_ErrorReceiverTimeout = UTIL_BIT( 10 ),
-    USB_STM32L496VGT6P_Event_RxEvent = UTIL_BIT( 11 ),
+    USB_STM32L496VGT6P_Event_Interrupt = UTIL_BIT( 0 ),
+    USB_STM32L496VGT6P_Event_Connected = UTIL_BIT( 1 ),
+    USB_STM32L496VGT6P_Event_Disconnected = UTIL_BIT( 2 ),
+    USB_STM32L496VGT6P_Event_StartOfFrame = UTIL_BIT( 3 ),
+    USB_STM32L496VGT6P_Event_Setup = UTIL_BIT( 4 ),
+    USB_STM32L496VGT6P_Event_Reset = UTIL_BIT( 5 ),
+    USB_STM32L496VGT6P_Event_Suspend = UTIL_BIT( 6 ),
+    USB_STM32L496VGT6P_Event_Resume = UTIL_BIT( 7 ),
+    USB_STM32L496VGT6P_Event_Tx = UTIL_BIT( 8 ),
+    USB_STM32L496VGT6P_Event_Rx = UTIL_BIT( 9 ),
+    USB_STM32L496VGT6P_Event_TxIncomplete = UTIL_BIT( 10 ),
+    USB_STM32L496VGT6P_Event_RxIncomplete = UTIL_BIT( 11 ),
 } USB_STM32L496VGT6P_Event_t;
 
 typedef struct USB_STM32L496VGT6P_Buffer_Receive
@@ -100,10 +100,11 @@ typedef struct USB_STM32L496VGT6P_Buffer_Transmit
 typedef struct USB_STM32L496VGT6P_Instance_Context
 {
     PCD_HandleTypeDef USBx;
+    // TODO Transform the following to Process->Operation paradigm
     volatile USB_STM32L496VGT6P_Status_t Status;
     USB_STM32L496VGT6P_Buffer_Receive_t Receive;
     USB_STM32L496VGT6P_Buffer_Transmit_t Transmit;
-    USB_STM32L496VGT6P_Event_t Event; // TODO Does it need a context to be associated ? in addition to a queue ?
+    USB_STM32L496VGT6P_Event_t Event;
 } USB_STM32L496VGT6P_Instance_Context_t;
 
 typedef struct USB_STM32L496VGT6P_Context
@@ -122,6 +123,19 @@ void USB_STM32L496VGT6P_RxCpltCallback( uint8_t * pbuf, uint32_t * Len );
 void USB_STM32L496VGT6P_TxCpltCallback( uint8_t * pbuf, uint32_t * Len );
 
 void OTG_FS_IRQHandler( void );
+
+void HAL_PCD_SOFCallback( PCD_HandleTypeDef * hpcd );
+void HAL_PCD_SetupStageCallback( PCD_HandleTypeDef * hpcd );
+void HAL_PCD_ResetCallback( PCD_HandleTypeDef * hpcd );
+void HAL_PCD_SuspendCallback( PCD_HandleTypeDef * hpcd );
+void HAL_PCD_ResumeCallback( PCD_HandleTypeDef * hpcd );
+void HAL_PCD_ConnectCallback( PCD_HandleTypeDef * hpcd );
+void HAL_PCD_DisconnectCallback( PCD_HandleTypeDef * hpcd );
+
+void HAL_PCD_DataOutStageCallback( PCD_HandleTypeDef * hpcd, uint8_t epnum );
+void HAL_PCD_DataInStageCallback( PCD_HandleTypeDef * hpcd, uint8_t epnum );
+void HAL_PCD_ISOOUTIncompleteCallback( PCD_HandleTypeDef * hpcd, uint8_t epnum );
+void HAL_PCD_ISOINIncompleteCallback( PCD_HandleTypeDef * hpcd, uint8_t epnum );
 
 static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Instance_Write( USB_STM32L496VGT6P_Instance_t * Instance, USB_STM32L496VGT6P_Data_t * Data, USB_STM32L496VGT6P_DataLength_t DataLength );
 static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Instance_Read( USB_STM32L496VGT6P_Instance_t * Instance, USB_STM32L496VGT6P_Data_t * Data, USB_STM32L496VGT6P_DataLength_t DataLength );
@@ -204,8 +218,144 @@ void USB_STM32L496VGT6P_TxCpltCallback( uint8_t * pbuf, uint32_t * Len )
 
 void OTG_FS_IRQHandler( void )
 {
-    PCD_HandleTypeDef * hpcd = &USB_STM32L496VGT6P_Context.Context[ USB_STM32L496VGT6P_1 ].USBx;
+    USB_STM32L496VGT6P_Instance_Context_t * Context = &USB_STM32L496VGT6P_Context.Context[ USB_STM32L496VGT6P_1 ];
+
+    Context->Event |= USB_STM32L496VGT6P_Event_Interrupt;
+
+    PCD_HandleTypeDef * hpcd = &Context->USBx;
     HAL_PCD_IRQHandler( hpcd );
+}
+
+void HAL_PCD_SOFCallback( PCD_HandleTypeDef * hpcd )
+{
+    USB_STM32L496VGT6P_Instance_Context_t * Context = &USB_STM32L496VGT6P_Context.Context[ USB_STM32L496VGT6P_1 ];
+
+    Context->Event |= USB_STM32L496VGT6P_Event_StartOfFrame;
+
+    USBD_LL_SOF( ( USBD_HandleTypeDef * ) hpcd->pData );
+}
+
+void HAL_PCD_SetupStageCallback( PCD_HandleTypeDef * hpcd )
+{
+    USB_STM32L496VGT6P_Instance_Context_t * Context = &USB_STM32L496VGT6P_Context.Context[ USB_STM32L496VGT6P_1 ];
+
+    Context->Event |= USB_STM32L496VGT6P_Event_Setup;
+
+    USBD_LL_SetupStage( ( USBD_HandleTypeDef * ) hpcd->pData, ( uint8_t * ) hpcd->Setup );
+}
+
+void HAL_PCD_ResetCallback( PCD_HandleTypeDef * hpcd )
+{
+    USBD_SpeedTypeDef speed = USBD_SPEED_FULL;
+    USB_STM32L496VGT6P_Instance_Context_t * Context = &USB_STM32L496VGT6P_Context.Context[ USB_STM32L496VGT6P_1 ];
+
+    Context->Event |= USB_STM32L496VGT6P_Event_Reset;
+
+    if ( hpcd->Init.speed != PCD_SPEED_FULL )
+    {
+        Error_Handler( );
+    }
+    /* Set Speed. */
+    USBD_LL_SetSpeed( ( USBD_HandleTypeDef * ) hpcd->pData, speed );
+
+    /* Reset Device. */
+    USBD_LL_Reset( ( USBD_HandleTypeDef * ) hpcd->pData );
+}
+
+void HAL_PCD_SuspendCallback( PCD_HandleTypeDef * hpcd )
+{
+    USB_STM32L496VGT6P_Instance_Context_t * Context = &USB_STM32L496VGT6P_Context.Context[ USB_STM32L496VGT6P_1 ];
+
+    Context->Event |= USB_STM32L496VGT6P_Event_Suspend;
+
+    __HAL_PCD_GATE_PHYCLOCK( hpcd );
+    /* Inform USB library that core enters in suspend Mode. */
+    USBD_LL_Suspend( ( USBD_HandleTypeDef * ) hpcd->pData );
+    /* Enter in STOP mode. */
+    /* USER CODE BEGIN 2 */
+    if ( hpcd->Init.low_power_enable )
+    {
+        /* Set SLEEPDEEP bit and SleepOnExit of Cortex System Control Register. */
+        SCB->SCR |= ( uint32_t ) ( ( uint32_t ) ( SCB_SCR_SLEEPDEEP_Msk | SCB_SCR_SLEEPONEXIT_Msk ) );
+    }
+    /* USER CODE END 2 */
+}
+
+void HAL_PCD_ResumeCallback( PCD_HandleTypeDef * hpcd )
+{
+    USB_STM32L496VGT6P_Instance_Context_t * Context = &USB_STM32L496VGT6P_Context.Context[ USB_STM32L496VGT6P_1 ];
+
+    Context->Event |= USB_STM32L496VGT6P_Event_Resume;
+
+    __HAL_PCD_UNGATE_PHYCLOCK( hpcd );
+
+    /* USER CODE BEGIN 3 */
+    if ( hpcd->Init.low_power_enable )
+    {
+        /* Reset SLEEPDEEP bit of Cortex System Control Register. */
+        SCB->SCR &= ( uint32_t ) ~( ( uint32_t ) ( SCB_SCR_SLEEPDEEP_Msk | SCB_SCR_SLEEPONEXIT_Msk ) );
+        // TODO Let the following being done through the kernel or suitable module
+        // FIXME Instead of using SystemClockConfig_Resume();
+        //       Use directly SystemClock_Config();
+        extern void SystemClock_Config( void );
+        SystemClock_Config( );
+    }
+    /* USER CODE END 3 */
+    USBD_LL_Resume( ( USBD_HandleTypeDef * ) hpcd->pData );
+}
+
+void HAL_PCD_ConnectCallback( PCD_HandleTypeDef * hpcd )
+{
+    USB_STM32L496VGT6P_Instance_Context_t * Context = &USB_STM32L496VGT6P_Context.Context[ USB_STM32L496VGT6P_1 ];
+
+    Context->Event |= USB_STM32L496VGT6P_Event_Connected;
+
+    USBD_LL_DevConnected( ( USBD_HandleTypeDef * ) hpcd->pData );
+}
+
+void HAL_PCD_DisconnectCallback( PCD_HandleTypeDef * hpcd )
+{
+    USB_STM32L496VGT6P_Instance_Context_t * Context = &USB_STM32L496VGT6P_Context.Context[ USB_STM32L496VGT6P_1 ];
+
+    Context->Event |= USB_STM32L496VGT6P_Event_Disconnected;
+
+    USBD_LL_DevDisconnected( ( USBD_HandleTypeDef * ) hpcd->pData );
+}
+
+void HAL_PCD_DataOutStageCallback( PCD_HandleTypeDef * hpcd, uint8_t epnum )
+{
+    USB_STM32L496VGT6P_Instance_Context_t * Context = &USB_STM32L496VGT6P_Context.Context[ USB_STM32L496VGT6P_1 ];
+
+    Context->Event |= USB_STM32L496VGT6P_Event_Rx;
+
+    USBD_LL_DataOutStage( ( USBD_HandleTypeDef * ) hpcd->pData, epnum, hpcd->OUT_ep[ epnum ].xfer_buff );
+}
+
+void HAL_PCD_DataInStageCallback( PCD_HandleTypeDef * hpcd, uint8_t epnum )
+{
+    USB_STM32L496VGT6P_Instance_Context_t * Context = &USB_STM32L496VGT6P_Context.Context[ USB_STM32L496VGT6P_1 ];
+
+    Context->Event |= USB_STM32L496VGT6P_Event_Tx;
+
+    USBD_LL_DataInStage( ( USBD_HandleTypeDef * ) hpcd->pData, epnum, hpcd->IN_ep[ epnum ].xfer_buff );
+}
+
+void HAL_PCD_ISOOUTIncompleteCallback( PCD_HandleTypeDef * hpcd, uint8_t epnum )
+{
+    USB_STM32L496VGT6P_Instance_Context_t * Context = &USB_STM32L496VGT6P_Context.Context[ USB_STM32L496VGT6P_1 ];
+
+    Context->Event |= USB_STM32L496VGT6P_Event_RxIncomplete;
+
+    USBD_LL_IsoOUTIncomplete( ( USBD_HandleTypeDef * ) hpcd->pData, epnum );
+}
+
+void HAL_PCD_ISOINIncompleteCallback( PCD_HandleTypeDef * hpcd, uint8_t epnum )
+{
+    USB_STM32L496VGT6P_Instance_Context_t * Context = &USB_STM32L496VGT6P_Context.Context[ USB_STM32L496VGT6P_1 ];
+
+    Context->Event |= USB_STM32L496VGT6P_Event_TxIncomplete;
+
+    USBD_LL_IsoINIncomplete( ( USBD_HandleTypeDef * ) hpcd->pData, epnum );
 }
 
 static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Instance_Write( USB_STM32L496VGT6P_Instance_t * Instance, USB_STM32L496VGT6P_Data_t * Data, USB_STM32L496VGT6P_DataLength_t DataLength )
@@ -329,23 +479,89 @@ static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Instance_Cycle( USB_STM32L
         }
 
         Status = USB_STM32L496VGT6P_Status_Success;
-        switch ( Instance->Context->Status )
+
+        if ( ( Instance->Context->Event & USB_STM32L496VGT6P_Event_Interrupt ) != 0 )
         {
-            case USB_STM32L496VGT6P_Status_Busy:
-                // Wait for end of action
-                break;
-            default:
-                if ( Instance->Context->Transmit.Length > 0 )
-                {
-                    // FIXME
-                    //          if ( CDC_Transmit_FS( Instance->Context->Transmit.Content, Instance->Context->Transmit.Length ) != USBD_OK )
-                    //          {
-                    //            Status = USB_STM32L496VGT6P_Status_Error;
-                    //            break;
-                    //          }
-                    Instance->Context->Status = USB_STM32L496VGT6P_Status_Busy;
-                }
-                break;
+            Instance->Context->Event &= ~USB_STM32L496VGT6P_Event_Interrupt;
+            USB_Trace( "Interrupt: Instance=%p, USBx=%d", Instance, Instance->USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Instance->Context->Event & USB_STM32L496VGT6P_Event_Connected ) != 0 )
+        {
+            Instance->Context->Event &= ~USB_STM32L496VGT6P_Event_Connected;
+            USB_Debug( "Connected: Instance=%p, USBx=%d", Instance, Instance->USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Instance->Context->Event & USB_STM32L496VGT6P_Event_Disconnected ) != 0 )
+        {
+            Instance->Context->Event &= ~USB_STM32L496VGT6P_Event_Disconnected;
+            USB_Debug( "DisConnected: Instance=%p, USBx=%d", Instance, Instance->USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Instance->Context->Event & USB_STM32L496VGT6P_Event_StartOfFrame ) != 0 )
+        {
+            Instance->Context->Event &= ~USB_STM32L496VGT6P_Event_StartOfFrame;
+            USB_Debug( "Start Of Frame: Instance=%p, USBx=%d", Instance, Instance->USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Instance->Context->Event & USB_STM32L496VGT6P_Event_Setup ) != 0 )
+        {
+            Instance->Context->Event &= ~USB_STM32L496VGT6P_Event_Setup;
+            USB_Debug( "Setup: Instance=%p, USBx=%d", Instance, Instance->USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Instance->Context->Event & USB_STM32L496VGT6P_Event_Reset ) != 0 )
+        {
+            Instance->Context->Event &= ~USB_STM32L496VGT6P_Event_Reset;
+            USB_Debug( "Reset: Instance=%p, USBx=%d", Instance, Instance->USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Instance->Context->Event & USB_STM32L496VGT6P_Event_Suspend ) != 0 )
+        {
+            Instance->Context->Event &= ~USB_STM32L496VGT6P_Event_Suspend;
+            USB_Debug( "Suspend: Instance=%p, USBx=%d", Instance, Instance->USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Instance->Context->Event & USB_STM32L496VGT6P_Event_Resume ) != 0 )
+        {
+            Instance->Context->Event &= ~USB_STM32L496VGT6P_Event_Resume;
+            USB_Debug( "Resume: Instance=%p, USBx=%d", Instance, Instance->USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Instance->Context->Event & USB_STM32L496VGT6P_Event_Tx ) != 0 )
+        {
+            Instance->Context->Event &= ~USB_STM32L496VGT6P_Event_Tx;
+            USB_Debug( "TX Complete: Instance=%p, USBx=%d", Instance, Instance->USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Instance->Context->Event & USB_STM32L496VGT6P_Event_Rx ) != 0 )
+        {
+            Instance->Context->Event &= ~USB_STM32L496VGT6P_Event_Rx;
+            USB_Debug( "RX Complete: Instance=%p, USBx=%d", Instance, Instance->USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Instance->Context->Event & USB_STM32L496VGT6P_Event_TxIncomplete ) != 0 )
+        {
+            Instance->Context->Event &= ~USB_STM32L496VGT6P_Event_TxIncomplete;
+            USB_Debug( "TX Incomplete: Instance=%p, USBx=%d", Instance, Instance->USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Instance->Context->Event & USB_STM32L496VGT6P_Event_RxIncomplete ) != 0 )
+        {
+            Instance->Context->Event &= ~USB_STM32L496VGT6P_Event_RxIncomplete;
+            USB_Debug( "RX Incomplete: Instance=%p, USBx=%d", Instance, Instance->USBx );
+            // TODO Invoke Callback
         }
     }
     while ( 0 );
@@ -517,7 +733,7 @@ USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Read( USB_STM32L496VGT6P_Instance
 // #### Public Variable(s) #####################################################
 // #############################################################################
 
-const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260117-1502";
+const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260120-0211";
 
 // #############################################################################
 // #### File Guard #############################################################

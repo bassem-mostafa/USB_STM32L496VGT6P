@@ -98,6 +98,19 @@ extern "C"
         USB_STM32L496VGT6P_Count  ///< Count
     } USB_STM32L496VGT6P_t;
 
+    // TODO Support Transmit & Receive Over/From End-Points Through Callbacks
+    /**
+     *  @brief USB STM32L496VGT6P End-Point
+     *
+     *  @enum USB_STM32L496VGT6P_t
+     */
+    typedef enum USB_STM32L496VGT6P_EndPoint
+    {
+        USB_STM32L496VGT6P_EndPoint_1 = 0, ///< End-point 1
+        USB_STM32L496VGT6P_EndPoint_2,     ///< End-point 2
+        USB_STM32L496VGT6P_EndPoint_Count  ///< Count
+    } USB_STM32L496VGT6P_EndPoint_t;
+
     /**
      *  @brief USB STM32L496VGT6P Instance Context
      *
