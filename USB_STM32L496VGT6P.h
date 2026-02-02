@@ -195,8 +195,6 @@ extern "C"
      */
     USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Read( USB_STM32L496VGT6P_Instance_t * Instance, USB_STM32L496VGT6P_Data_t * Data, USB_STM32L496VGT6P_DataLength_t DataLength );
 
-    // TODO Add More APIs
-
     // #############################################################################
     // #### Public Variable(s) #####################################################
     // #############################################################################
