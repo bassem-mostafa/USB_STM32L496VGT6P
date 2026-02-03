@@ -36,9 +36,9 @@
     #define DEBUG
 #endif
 
-// #ifdef DEBUG
-//    #undef DEBUG
-// #endif
+#ifdef DEBUG
+    #undef DEBUG
+#endif
 
 // #############################################################################
 // #### File Guard #############################################################
@@ -253,6 +253,9 @@ static GPIO_Status_t GPIO_CallbackOnInterrupt( GPIO_t GPIOx, GPIO_ContextOnInter
         USB_STM32L496VGT6P_Instance_t * Instance = Context;
         if ( GPIOx == Instance->VBUS_Sense )
         {
+            /*
+             * @brief  Handle USB VBUS detection upon external interrupt
+             */
             PCD_HandleTypeDef * hpcd = &Instance->Context->USBx;
             HAL_PCDEx_BCD_VBUSDetect( hpcd );
         }
@@ -527,6 +530,12 @@ static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Instance_Initialize( USB_S
                 GPIO_Status_t GPIO_Status = GPIO_Status_Success;
 
                 // TODO Configure GPIOs
+
+                if ( ( GPIO_Status = GPIO_SetMode( Instance->VBUS_Sense, GPIO_Mode_Interrupt ) ) != GPIO_Status_Success )
+                {
+                    Status = USB_Status_Error;
+                    break;
+                }
 
                 if ( ( GPIO_Status = GPIO_SetCallbackOnInterrupt( Instance->VBUS_Sense, GPIO_CallbackOnInterrupt, Instance ) ) != GPIO_Status_Success )
                 {
@@ -1200,7 +1209,7 @@ USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Read( USB_STM32L496VGT6P_Instance
 // #### Public Variable(s) #####################################################
 // #############################################################################
 
-const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260202-1914";
+const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260203-0213";
 
 // #############################################################################
 // #### File Guard #############################################################
