@@ -174,6 +174,15 @@ extern "C"
     USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_DeInitialize( USB_STM32L496VGT6P_Instance_t * Instance );
 
     /**
+     *  @brief Check readiness of specified USB STM32L496VGT6P Instance
+     *
+     *  @param[in] Instance Instance
+     *
+     *  @return USB_STM32L496VGT6P_Status_t
+     */
+    USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_IsReady( USB_STM32L496VGT6P_Instance_t * Instance );
+
+    /**
      *  @brief Writes data to specified USB STM32L496VGT6P Instance
      *
      *  @param[in] Instance   Instance

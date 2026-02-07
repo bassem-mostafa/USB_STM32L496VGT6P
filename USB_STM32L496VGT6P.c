@@ -73,11 +73,12 @@
  */
 typedef enum USB_STM32L496VGT6P_OperationType
 {
-    USB_STM32L496VGT6P_OperationType_None = 0, ///< None
-    USB_STM32L496VGT6P_OperationType_Pending,  ///< Pending
-    USB_STM32L496VGT6P_OperationType_Commit,   ///< Commit
-    USB_STM32L496VGT6P_OperationType_Transmit, ///< Transmit
-    USB_STM32L496VGT6P_OperationType_Receive,  ///< Receive
+    USB_STM32L496VGT6P_OperationType_None = 0,          ///< None
+    USB_STM32L496VGT6P_OperationType_Pending,           ///< Pending
+    USB_STM32L496VGT6P_OperationType_Commit,            ///< Commit
+    USB_STM32L496VGT6P_OperationType_DataTerminalReady, ///< Data Terminal Ready (DTR)
+    USB_STM32L496VGT6P_OperationType_Transmit,          ///< Transmit
+    USB_STM32L496VGT6P_OperationType_Receive,           ///< Receive
 } USB_STM32L496VGT6P_OperationType_t;
 
 /**
@@ -169,11 +170,21 @@ typedef enum USB_STM32L496VGT6P_Event
     USB_STM32L496VGT6P_Event_RxComplete = UTIL_BIT( 11 ),
     USB_STM32L496VGT6P_Event_TxIncomplete = UTIL_BIT( 12 ),
     USB_STM32L496VGT6P_Event_RxIncomplete = UTIL_BIT( 13 ),
+    USB_STM32L496VGT6P_Event_DataTerminalReady_Enabled = UTIL_BIT( 14 ),
+    USB_STM32L496VGT6P_Event_DataTerminalReady_Disabled = UTIL_BIT( 15 ),
 } USB_STM32L496VGT6P_Event_t;
+
+typedef enum USB_STM32L496VGT6P_DataTerminalReady
+{
+    USB_STM32L496VGT6P_DataTerminalReady_Disabled = 0,
+    USB_STM32L496VGT6P_DataTerminalReady_Enabled,
+} USB_STM32L496VGT6P_DataTerminalReady_t;
 
 typedef struct USB_STM32L496VGT6P_Instance_Context
 {
     PCD_HandleTypeDef USBx;
+
+    USB_STM32L496VGT6P_DataTerminalReady_t DataTerminalReady;
 
     USB_STM32L496VGT6P_Event_t Event;
 
@@ -194,6 +205,8 @@ static GPIO_Status_t GPIO_CallbackOnInterrupt( GPIO_t GPIOx, GPIO_ContextOnInter
 
 void USB_STM32L496VGT6P_RxCpltCallback( uint8_t * pbuf, uint32_t * Len );
 void USB_STM32L496VGT6P_TxCpltCallback( uint8_t * pbuf, uint32_t * Len );
+
+void USB_STM32L496VGT6P_DataTerminalReadyCallback( uint8_t dtr );
 
 void OTG_FS_IRQHandler( void );
 
@@ -225,6 +238,9 @@ static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_ProcessTransmit( USB_STM32
 
 static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_OperationCommitExecute( USB_STM32L496VGT6P_Instance_t * Instance );
 static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_OperationCommitResolve( USB_STM32L496VGT6P_Instance_t * Instance );
+
+static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_OperationDataTerminalReadyExecute( USB_STM32L496VGT6P_Instance_t * Instance );
+static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_OperationDataTerminalReadyResolve( USB_STM32L496VGT6P_Instance_t * Instance );
 
 static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_OperationTransmitExecute( USB_STM32L496VGT6P_Instance_t * Instance );
 static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_OperationTransmitResolve( USB_STM32L496VGT6P_Instance_t * Instance );
@@ -318,6 +334,20 @@ void USB_STM32L496VGT6P_TxCpltCallback( uint8_t * pbuf, uint32_t * Len )
         Instance->Context->Status = USB_STM32L496VGT6P_Status_Error;
     }
     #endif
+}
+
+void USB_STM32L496VGT6P_DataTerminalReadyCallback( uint8_t dtr )
+{
+    USB_STM32L496VGT6P_Instance_Context_t * Context = &USB_STM32L496VGT6P_Context.Context[ USB_STM32L496VGT6P_1 ];
+
+    if ( dtr )
+    {
+        Context->Event |= USB_STM32L496VGT6P_Event_DataTerminalReady_Enabled;
+    }
+    else
+    {
+        Context->Event |= USB_STM32L496VGT6P_Event_DataTerminalReady_Disabled;
+    }
 }
 
 void OTG_FS_IRQHandler( void )
@@ -468,6 +498,13 @@ static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Context_Initialize( void )
     {
         USB_Trace( "%s( void )", __FUNCTION__ );
 
+        TIM_Status_t TIM_Status = TIM_Status_Error;
+        if ( ( TIM_Status = TIM_GetTimestamp( USB_TIM, &USB_STM32L496VGT6P_Context.Timestamp ) ) != TIM_Status_Success )
+        {
+            Status = USB_STM32L496VGT6P_Status_Error;
+            break;
+        }
+
         // FIXME Remove the usage of `MX_USB_DEVICE_Init()`
     #if 1
         extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
@@ -490,6 +527,13 @@ static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Context_Cycle( void )
     do
     {
         USB_Trace( "%s( void )", __FUNCTION__ );
+
+        TIM_Status_t TIM_Status = TIM_Status_Error;
+        if ( ( TIM_Status = TIM_GetTimestamp( USB_TIM, &USB_STM32L496VGT6P_Context.Timestamp ) ) != TIM_Status_Success )
+        {
+            Status = USB_STM32L496VGT6P_Status_Error;
+            break;
+        }
     }
     while ( 0 );
 
@@ -698,6 +742,24 @@ static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Instance_Cycle( USB_STM32L
             Context->Event &= ~USB_STM32L496VGT6P_Event_RxIncomplete;
             USB_Debug( "RX Incomplete: Instance=%p, USBx=%d", Instance, Instance->USBx );
             // TODO Invoke Callback
+        }
+
+        if ( ( Event & USB_STM32L496VGT6P_Event_DataTerminalReady_Enabled ) == USB_STM32L496VGT6P_Event_DataTerminalReady_Enabled )
+        {
+            Context->Event &= ~USB_STM32L496VGT6P_Event_DataTerminalReady_Enabled;
+            USB_Debug( "DTR Enabled: Instance=%p, USBx=%d", Instance, Instance->USBx );
+            // TODO Invoke Callback
+
+            Context->DataTerminalReady = USB_STM32L496VGT6P_DataTerminalReady_Enabled;
+        }
+
+        if ( ( Event & USB_STM32L496VGT6P_Event_DataTerminalReady_Disabled ) == USB_STM32L496VGT6P_Event_DataTerminalReady_Disabled )
+        {
+            Context->Event &= ~USB_STM32L496VGT6P_Event_DataTerminalReady_Disabled;
+            USB_Debug( "DTR Disabled: Instance=%p, USBx=%d", Instance, Instance->USBx );
+            // TODO Invoke Callback
+
+            Context->DataTerminalReady = USB_STM32L496VGT6P_DataTerminalReady_Disabled;
         }
     }
     while ( 0 );
@@ -1159,6 +1221,48 @@ USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_DeInitialize( USB_STM32L496VGT6P_
     return Status;
 }
 
+USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_IsReady( USB_STM32L496VGT6P_Instance_t * Instance )
+{
+    USB_STM32L496VGT6P_Status_t Status = USB_STM32L496VGT6P_Status_Success;
+
+    do
+    {
+        USB_Trace( "%s( Instance=%p )", __FUNCTION__, Instance );
+
+        if ( Instance == NULL )
+        {
+            Status = USB_STM32L496VGT6P_Status_ArgumentInvalid;
+            break;
+        }
+
+        if ( Instance->Context == NULL )
+        {
+            Status = USB_STM32L496VGT6P_Status_Error;
+            break;
+        }
+
+        USB_STM32L496VGT6P_Instance_Context_t * Context = &USB_STM32L496VGT6P_Context.Context[ Instance->USBx ];
+        USB_STM32L496VGT6P_Process_t * Process = &Context->Process;
+        USB_STM32L496VGT6P_Operation_t * Operation = &Process->Context.Operation;
+
+        if ( Process->Type != USB_STM32L496VGT6P_ProcessType_None
+             || Operation->Type != USB_STM32L496VGT6P_OperationType_None )
+        {
+            Status = USB_STM32L496VGT6P_Status_Busy;
+            break;
+        }
+
+        if ( Context->DataTerminalReady != USB_STM32L496VGT6P_DataTerminalReady_Enabled )
+        {
+            Status = USB_STM32L496VGT6P_Status_Error;
+            break;
+        }
+    }
+    while ( 0 );
+
+    return Status;
+}
+
 USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Write( USB_STM32L496VGT6P_Instance_t * Instance, USB_STM32L496VGT6P_Data_t * Data, USB_STM32L496VGT6P_DataLength_t DataLength )
 {
     USB_STM32L496VGT6P_Status_t Status = USB_STM32L496VGT6P_Status_Success;
@@ -1175,6 +1279,13 @@ USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Write( USB_STM32L496VGT6P_Instanc
         USB_STM32L496VGT6P_Instance_Context_t * Context = &USB_STM32L496VGT6P_Context.Context[ Instance->USBx ];
         USB_STM32L496VGT6P_Process_t * Process = &Context->Process;
         USB_STM32L496VGT6P_Operation_t * Operation = &Process->Context.Operation;
+
+        if ( Process->Type != USB_STM32L496VGT6P_ProcessType_None
+             || Operation->Type != USB_STM32L496VGT6P_OperationType_None )
+        {
+            Status = USB_STM32L496VGT6P_Status_Busy;
+            break;
+        }
 
         Status = USB_STM32L496VGT6P_SetProcess( Instance, USB_STM32L496VGT6P_ProcessType_Transmit );
 
@@ -1209,7 +1320,7 @@ USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Read( USB_STM32L496VGT6P_Instance
 // #### Public Variable(s) #####################################################
 // #############################################################################
 
-const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260203-0213";
+const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260207-2231";
 
 // #############################################################################
 // #### File Guard #############################################################
