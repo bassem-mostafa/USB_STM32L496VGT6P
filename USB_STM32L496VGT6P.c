@@ -95,6 +95,7 @@ typedef struct USB_STM32L496VGT6P_OperationContext
 {
     USB_STM32L496VGT6P_Data_t * DataTx;
     USB_STM32L496VGT6P_DataLength_t DataTxLength;
+    USB_STM32L496VGT6P_Interface_t DataTxInterface;
 
     USB_STM32L496VGT6P_Data_t * DataRx;
     USB_STM32L496VGT6P_DataLength_t DataRxLength;
@@ -1032,7 +1033,7 @@ static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_OperationTransmitExecute( 
         USB_STM32L496VGT6P_Operation_t * Operation = &Process->Context.Operation;
 
         USBD_StatusTypeDef USBD_Status = USBD_OK;
-        if ( ( USBD_Status = CDC_Transmit_FS( Operation->Context.DataTx, Operation->Context.DataTxLength ) ) != USBD_OK )
+        if ( ( USBD_Status = CDC_Transmit_FS( Operation->Context.DataTx, Operation->Context.DataTxLength, Operation->Context.DataTxInterface ) ) != USBD_OK )
         {
             Status = USB_STM32L496VGT6P_Status_Error;
             break;
@@ -1263,12 +1264,12 @@ USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_IsReady( USB_STM32L496VGT6P_Insta
     return Status;
 }
 
-USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Write( USB_STM32L496VGT6P_Instance_t * Instance, USB_STM32L496VGT6P_Data_t * Data, USB_STM32L496VGT6P_DataLength_t DataLength )
+USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Write( USB_STM32L496VGT6P_Instance_t * Instance, USB_STM32L496VGT6P_Interface_t Interface, USB_STM32L496VGT6P_Data_t * Data, USB_STM32L496VGT6P_DataLength_t DataLength )
 {
     USB_STM32L496VGT6P_Status_t Status = USB_STM32L496VGT6P_Status_Success;
     do
     {
-        USB_Trace( "%s( Instance=%p, Data=%p, Length=%d )", __FUNCTION__, Instance, Data, DataLength );
+        USB_Trace( "%s( Instance=%p, Interface=%d, Data=%p, Length=%d )", __FUNCTION__, Instance, Interface, Data, DataLength );
 
         if ( Instance == NULL )
         {
@@ -1291,17 +1292,18 @@ USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Write( USB_STM32L496VGT6P_Instanc
 
         Operation->Context.DataTx = Data;
         Operation->Context.DataTxLength = DataLength;
+        Operation->Context.DataTxInterface = Interface;
     }
     while ( 0 );
     return Status;
 }
 
-USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Read( USB_STM32L496VGT6P_Instance_t * Instance, USB_STM32L496VGT6P_Data_t * Data, USB_STM32L496VGT6P_DataLength_t DataLength )
+USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Read( USB_STM32L496VGT6P_Instance_t * Instance, USB_STM32L496VGT6P_Interface_t Interface, USB_STM32L496VGT6P_Data_t * Data, USB_STM32L496VGT6P_DataLength_t DataLength )
 {
     USB_STM32L496VGT6P_Status_t Status = USB_STM32L496VGT6P_Status_Success;
     do
     {
-        USB_Trace( "%s( Instance=%p )", __FUNCTION__, Instance );
+        USB_Trace( "%s( Instance=%p, Interface=%d, Data=%p, Length=%d )", __FUNCTION__, Instance, Interface, Data, DataLength );
 
         if ( Instance == NULL )
         {
@@ -1320,7 +1322,7 @@ USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Read( USB_STM32L496VGT6P_Instance
 // #### Public Variable(s) #####################################################
 // #############################################################################
 
-const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260207-2231";
+const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260213-1224";
 
 // #############################################################################
 // #### File Guard #############################################################
