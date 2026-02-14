@@ -105,7 +105,7 @@ extern "C"
      */
     typedef enum USB_STM32L496VGT6P_Interface
     {
-        USB_STM32L496VGT6P_Interface_1,     ///< USB Interface 1
+        USB_STM32L496VGT6P_Interface_1 = 0, ///< USB Interface 1
         USB_STM32L496VGT6P_Interface_2,     ///< USB Interface 2
         USB_STM32L496VGT6P_Interface_Count, ///< Count
     } USB_STM32L496VGT6P_Interface_t;
@@ -189,10 +189,11 @@ extern "C"
      *  @brief Check readiness of specified USB STM32L496VGT6P Instance
      *
      *  @param[in] Instance Instance
+     *  @param[in] Interface  Interface
      *
      *  @return USB_STM32L496VGT6P_Status_t
      */
-    USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_IsReady( USB_STM32L496VGT6P_Instance_t * Instance );
+    USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_IsReady( USB_STM32L496VGT6P_Instance_t * Instance, USB_STM32L496VGT6P_Interface_t Interface );
 
     /**
      *  @brief Writes data to specified USB STM32L496VGT6P Instance
