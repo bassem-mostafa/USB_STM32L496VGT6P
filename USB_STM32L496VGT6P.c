@@ -287,7 +287,7 @@ void USB_STM32L496VGT6P_RxCpltCallback( uint8_t * pbuf, uint32_t * Len )
 
     Context->Event |= USB_STM32L496VGT6P_Event_RxComplete;
 
-    if ( Operation->Context.DataRxLength > *Len && Operation->Context.DataRx != NULL )
+    if ( Operation->Context.DataRxLength >= *Len && Operation->Context.DataRx != NULL )
     {
         UTIL_MemoryCopy( Operation->Context.DataRx, pbuf, *Len );
         Operation->Context.DataRxLength -= *Len;
@@ -1317,7 +1317,7 @@ USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Read( USB_STM32L496VGT6P_Instance
 // #### Public Variable(s) #####################################################
 // #############################################################################
 
-const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260214-1313";
+const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260305-1257";
 
 // #############################################################################
 // #### File Guard #############################################################
