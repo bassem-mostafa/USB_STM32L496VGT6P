@@ -126,9 +126,9 @@ extern "C"
     /**
      *  @brief USB STM32L496VGT6P Instance Context
      *
-     *  @struct USB_STM32L496VGT6P_Instance_Context_t
+     *  @struct USB_STM32L496VGT6P_InstanceContext_t
      */
-    typedef struct USB_STM32L496VGT6P_Instance_Context USB_STM32L496VGT6P_Instance_Context_t;
+    typedef struct USB_STM32L496VGT6P_InstanceContext USB_STM32L496VGT6P_InstanceContext_t;
 
     /**
      *  @brief USB STM32L496VGT6P Instance
@@ -141,7 +141,7 @@ extern "C"
         GPIO_t DP;
         GPIO_t DM;
         GPIO_t VBUS_Sense;
-        USB_STM32L496VGT6P_Instance_Context_t * Context;
+        USB_STM32L496VGT6P_InstanceContext_t * Context;
     } USB_STM32L496VGT6P_Instance_t;
 
     /**
