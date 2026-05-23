@@ -202,7 +202,7 @@ typedef struct USB_STM32L496VGT6P_Context
 // #### Private Method(s) Prototype ############################################
 // #############################################################################
 
-static GPIO_Status_t GPIO_CallbackOnInterrupt( GPIO_t GPIOx, GPIO_ContextOnInterrupt_t * Context );
+static GPIO_Status_t GPIO_CallbackOnInterrupt( GPIO_t GPIOx, GPIO_CallbackContext_t * Context );
 
 void USB_STM32L496VGT6P_RxCpltCallback( uint8_t * pbuf, uint32_t * Len );
 void USB_STM32L496VGT6P_TxCpltCallback( uint8_t * pbuf, uint32_t * Len );
@@ -256,7 +256,7 @@ static USB_STM32L496VGT6P_Context_t USB_STM32L496VGT6P_Context;
 // #### Private Method(s) ######################################################
 // #############################################################################
 
-static GPIO_Status_t GPIO_CallbackOnInterrupt( GPIO_t GPIOx, GPIO_ContextOnInterrupt_t * Context )
+static GPIO_Status_t GPIO_CallbackOnInterrupt( GPIO_t GPIOx, GPIO_CallbackContext_t * Context )
 {
     GPIO_Status_t GPIO_Status = GPIO_Status_Success;
 
@@ -574,14 +574,18 @@ static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Instance_Initialize( USB_S
                 GPIO_Status_t GPIO_Status = GPIO_Status_Success;
 
                 // TODO Configure GPIOs
-
-                if ( ( GPIO_Status = GPIO_SetMode( Instance->VBUS_Sense, GPIO_Mode_Interrupt ) ) != GPIO_Status_Success )
+                if ( ( GPIO_Status = GPIO_Configure( Instance->VBUS_Sense, ( GPIO_Configuration_t ) {
+                                                                               .Mode = GPIO_Mode_Interrupt,
+                                                                               .Function = GPIO_Function_Default, // FIXME Should be GPIO_Function_USB_VSENSE
+                                                                               .Pull = GPIO_Pull_None,
+                                                                           } ) )
+                     != GPIO_Status_Success )
                 {
                     Status = USB_Status_Error;
                     break;
                 }
 
-                if ( ( GPIO_Status = GPIO_SetCallbackOnInterrupt( Instance->VBUS_Sense, GPIO_CallbackOnInterrupt, Instance ) ) != GPIO_Status_Success )
+                if ( ( GPIO_Status = GPIO_SetOnInterrupt( Instance->VBUS_Sense, ( GPIO_OnInterrupt_t ) { .Callback = GPIO_CallbackOnInterrupt, .Context = Instance } ) ) != GPIO_Status_Success )
                 {
                     Status = USB_Status_Error;
                     break;
@@ -1317,7 +1321,7 @@ USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Read( USB_STM32L496VGT6P_Instance
 // #### Public Variable(s) #####################################################
 // #############################################################################
 
-const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260412-1852";
+const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260523-1800";
 
 // #############################################################################
 // #### File Guard #############################################################
