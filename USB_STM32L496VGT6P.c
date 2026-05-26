@@ -430,7 +430,7 @@ void HAL_PCD_ResumeCallback( PCD_HandleTypeDef * hpcd )
         SCB->SCR &= ( uint32_t ) ~( ( uint32_t ) ( SCB_SCR_SLEEPDEEP_Msk | SCB_SCR_SLEEPONEXIT_Msk ) );
         // FIXME Instead of using SystemClockConfig_Resume();
         //       Use directly SystemClock_Config() through KERNEL;
-        KERNEL_ClockEnable( );
+        KERNEL_ClockEnable( KERNEL_All );
     }
     /* USER CODE END 3 */
     USBD_LL_Resume( ( USBD_HandleTypeDef * ) hpcd->pData );
@@ -1297,7 +1297,7 @@ USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Read( USB_STM32L496VGT6P_t USBx, 
 // #### Public Variable(s) #####################################################
 // #############################################################################
 
-const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260526-1252";
+const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260526-1736";
 
 // #############################################################################
 // #### File Guard #############################################################
