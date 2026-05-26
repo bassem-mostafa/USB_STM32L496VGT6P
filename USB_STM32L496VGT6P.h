@@ -124,27 +124,6 @@ extern "C"
     } USB_STM32L496VGT6P_EndPoint_t;
 
     /**
-     *  @brief USB STM32L496VGT6P Instance Context
-     *
-     *  @struct USB_STM32L496VGT6P_InstanceContext_t
-     */
-    typedef struct USB_STM32L496VGT6P_InstanceContext USB_STM32L496VGT6P_InstanceContext_t;
-
-    /**
-     *  @brief USB STM32L496VGT6P Instance
-     *
-     *  @struct USB_STM32L496VGT6P_Instance_t
-     */
-    typedef struct USB_STM32L496VGT6P_Instance
-    {
-        USB_STM32L496VGT6P_t USBx;
-        GPIO_t DP;
-        GPIO_t DM;
-        GPIO_t VBUS_Sense;
-        USB_STM32L496VGT6P_InstanceContext_t * Context;
-    } USB_STM32L496VGT6P_Instance_t;
-
-    /**
      *  @brief USB STM32L496VGT6P Data
      */
     typedef uint8_t USB_STM32L496VGT6P_Data_t;
@@ -161,63 +140,63 @@ extern "C"
     /**
      *  @brief Initializes specified USB STM32L496VGT6P Instance
      *
-     *  @param[in] Instance Instance
+     *  @param[in] USBx Instance
      *
      *  @return USB_STM32L496VGT6P_Status_t
      */
-    USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Initialize( USB_STM32L496VGT6P_Instance_t * Instance );
+    USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Initialize( USB_STM32L496VGT6P_t USBx );
 
     /**
      *  @brief Cycles specified USB STM32L496VGT6P Instance
      *
-     *  @param[in] Instance Instance
+     *  @param[in] USBx Instance
      *
      *  @return USB_STM32L496VGT6P_Status_t
      */
-    USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Cycle( USB_STM32L496VGT6P_Instance_t * Instance );
+    USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Cycle( USB_STM32L496VGT6P_t USBx );
 
     /**
      *  @brief De-initializes specified USB STM32L496VGT6P Instance
      *
-     *  @param[in] Instance Instance
+     *  @param[in] USBx Instance
      *
      *  @return USB_STM32L496VGT6P_Status_t
      */
-    USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_DeInitialize( USB_STM32L496VGT6P_Instance_t * Instance );
+    USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_DeInitialize( USB_STM32L496VGT6P_t USBx );
 
     /**
      *  @brief Check readiness of specified USB STM32L496VGT6P Instance
      *
-     *  @param[in] Instance Instance
-     *  @param[in] Interface  Interface
+     *  @param[in] USBx      Instance
+     *  @param[in] Interface Interface
      *
      *  @return USB_STM32L496VGT6P_Status_t
      */
-    USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_IsReady( USB_STM32L496VGT6P_Instance_t * Instance, USB_STM32L496VGT6P_Interface_t Interface );
+    USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_IsReady( USB_STM32L496VGT6P_t USBx, USB_STM32L496VGT6P_Interface_t Interface );
 
     /**
      *  @brief Writes data to specified USB STM32L496VGT6P Instance
      *
-     *  @param[in] Instance   Instance
+     *  @param[in] USBx       Instance
      *  @param[in] Interface  Interface
      *  @param[in] Data       Data buffer
      *  @param[in] DataLength Length of data buffer
      *
      *  @return USB_STM32L496VGT6P_Status_t
      */
-    USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Write( USB_STM32L496VGT6P_Instance_t * Instance, USB_STM32L496VGT6P_Interface_t Interface, USB_STM32L496VGT6P_Data_t * Data, USB_STM32L496VGT6P_DataLength_t DataLength );
+    USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Write( USB_STM32L496VGT6P_t USBx, USB_STM32L496VGT6P_Interface_t Interface, USB_STM32L496VGT6P_Data_t * Data, USB_STM32L496VGT6P_DataLength_t DataLength );
 
     /**
      *  @brief Reads data from specified USB STM32L496VGT6P Instance
      *
-     *  @param[in]     Instance   Instance
+     *  @param[in]     USBx       Instance
      *  @param[in]     Interface  Interface
      *  @param[in,out] Data       Data buffer
      *  @param[in]     DataLength Length of data buffer
      *
      *  @return USB_STM32L496VGT6P_Status_t
      */
-    USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Read( USB_STM32L496VGT6P_Instance_t * Instance, USB_STM32L496VGT6P_Interface_t Interface, USB_STM32L496VGT6P_Data_t * Data, USB_STM32L496VGT6P_DataLength_t DataLength );
+    USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Read( USB_STM32L496VGT6P_t USBx, USB_STM32L496VGT6P_Interface_t Interface, USB_STM32L496VGT6P_Data_t * Data, USB_STM32L496VGT6P_DataLength_t DataLength );
 
     // #############################################################################
     // #### Public Variable(s) #####################################################
