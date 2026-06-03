@@ -1262,12 +1262,13 @@ USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Write( USB_STM32L496VGT6P_t USBx,
         USB_STM32L496VGT6P_Process_t * Process = &Context->Process;
         USB_STM32L496VGT6P_Operation_t * Operation = &Process->Context.Operation;
 
-        if ( Process->Type != USB_STM32L496VGT6P_ProcessType_None
-             || Operation->Type != USB_STM32L496VGT6P_OperationType_None )
-        {
-            Status = USB_STM32L496VGT6P_Status_Busy;
-            break;
-        }
+        // FIXME
+        // if ( Process->Type != USB_STM32L496VGT6P_ProcessType_None
+        //      || Operation->Type != USB_STM32L496VGT6P_OperationType_None )
+        // {
+        //     Status = USB_STM32L496VGT6P_Status_Busy;
+        //     break;
+        // }
 
         Status = USB_STM32L496VGT6P_SetProcess( USBx, USB_STM32L496VGT6P_ProcessType_Transmit );
 
@@ -1297,7 +1298,7 @@ USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Read( USB_STM32L496VGT6P_t USBx, 
 // #### Public Variable(s) #####################################################
 // #############################################################################
 
-const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260526-1736";
+const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260603-1011";
 
 // #############################################################################
 // #### File Guard #############################################################
