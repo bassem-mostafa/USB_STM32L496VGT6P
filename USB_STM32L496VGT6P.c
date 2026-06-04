@@ -37,7 +37,7 @@
 #endif
 
 #ifdef DEBUG
-    #undef DEBUG
+// #undef DEBUG // FIXME Un-Comment to disable logging within this file
 #endif
 
 // #############################################################################
@@ -243,8 +243,6 @@ static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_OperationCommitResolve( US
 // #############################################################################
 
 static USB_STM32L496VGT6P_Context_t USB_STM32L496VGT6P_Context;
-static uint8_t TransmitContent[ USB_STM32L496VGT6P_Interface_Count ][ 1024 ];
-static uint8_t ReceiveContent[ USB_STM32L496VGT6P_Interface_Count ][ 32 ];
 
 // #############################################################################
 // #### Private Method(s) ######################################################
@@ -473,6 +471,7 @@ void HAL_PCD_ISOINIncompleteCallback( PCD_HandleTypeDef * hpcd, uint8_t epnum )
 static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Context_Initialize( void )
 {
     USB_STM32L496VGT6P_Status_t Status = USB_STM32L496VGT6P_Status_Success;
+    BUFFER_Status_t BUFFER_Status = BUFFER_Status_Success;
 
     do
     {
@@ -490,9 +489,42 @@ static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Context_Initialize( void )
         extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
         extern void MX_USB_DEVICE_Init( void );
         MX_USB_DEVICE_Init( );
-        USB_STM32L496VGT6P_Context.Instance[ USB_STM32L496VGT6P_1 ].USBx = hpcd_USB_OTG_FS;
+        USB_STM32L496VGT6P_Instance_t * Instance = &USB_STM32L496VGT6P_Context.Instance[ USB_STM32L496VGT6P_1 ];
+        Instance->USBx = hpcd_USB_OTG_FS;
         // FIX Let the USBD use our instance
-        ( ( USBD_HandleTypeDef * ) ( hpcd_USB_OTG_FS.pData ) )->pData = &USB_STM32L496VGT6P_Context.Instance[ USB_STM32L496VGT6P_1 ].USBx;
+        // ( ( USBD_HandleTypeDef * ) ( hpcd_USB_OTG_FS.pData ) )->pData = &USB_STM32L496VGT6P_Context.Instance[ USB_STM32L496VGT6P_1 ].USBx; // @note Replaced by the following
+        USBD_HandleTypeDef * pdev = ( USBD_HandleTypeDef * ) hpcd_USB_OTG_FS.pData;
+        pdev->pData = &USB_STM32L496VGT6P_Context.Instance[ USB_STM32L496VGT6P_1 ].USBx;
+
+        // FIXME the following is skipped due to USB enumeration still in progress on this stage
+        // @note the following follows @ref MX_USB_DEVICE_Init() interface registration
+        for ( USB_STM32L496VGT6P_Interface_t Interface = USB_STM32L496VGT6P_Interface_1; Interface < USB_STM32L496VGT6P_Interface_Count; ++Interface )
+        {
+            uint32_t classId = USBD_CMPSIT_GetClassID( pdev, CLASS_TYPE_CDC, Interface );
+            if ( classId == 0xFFU )
+            {
+                USB_Warning( "Couldn't Retrieve CDC Interface %d Class ID", Interface );
+                continue;
+            }
+
+            USB_Debug( "CDC Interface %d Has Class ID %d", Interface, classId );
+
+            USB_Warning( "CDC Interface Buffers initialization has been skipped" );
+            continue;
+
+            USBD_CDC_HandleTypeDef * USB_Device_CDC = ( USBD_CDC_HandleTypeDef * ) pdev->pClassDataCmsit[ classId ];
+            if ( ( BUFFER_Status = BUFFER_Initialize( &Instance->Interface[ Interface ].Transmit, USB_Device_CDC->TxBuffer, USB_Device_CDC->TxLength ) ) != BUFFER_Status_Success )
+            {
+                Status = USB_STM32L496VGT6P_Status_Error;
+                break;
+            }
+
+            if ( ( BUFFER_Status = BUFFER_Initialize( &Instance->Interface[ Interface ].Receive, USB_Device_CDC->RxBuffer, USB_Device_CDC->RxLength ) ) != BUFFER_Status_Success )
+            {
+                Status = USB_STM32L496VGT6P_Status_Error;
+                break;
+            }
+        }
     #endif
     }
     while ( 0 );
@@ -527,6 +559,8 @@ static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Context_DeInitialize( void
     do
     {
         USB_Trace( "%s( void )", __FUNCTION__ );
+
+        UTIL_UNUSED( USB_STM32L496VGT6P_Context );
     }
     while ( 0 );
 
@@ -537,7 +571,6 @@ static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Instance_Initialize( USB_S
 {
     USB_STM32L496VGT6P_Status_t Status = USB_STM32L496VGT6P_Status_Success;
     GPIO_Status_t GPIO_Status = GPIO_Status_Success;
-    BUFFER_Status_t BUFFER_Status = BUFFER_Status_Success;
 
     do
     {
@@ -574,21 +607,6 @@ static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Instance_Initialize( USB_S
         if ( Status != USB_STM32L496VGT6P_Status_Success )
         {
             break;
-        }
-
-        for ( USB_STM32L496VGT6P_Interface_t Interface = USB_STM32L496VGT6P_Interface_1; Interface < USB_STM32L496VGT6P_Interface_Count; ++Interface )
-        {
-            if ( ( BUFFER_Status = BUFFER_Initialize( &Instance->Interface[ Interface ].Transmit, TransmitContent[ Interface ], UTIL_SizeOf( TransmitContent[ Interface ] ) ) ) != BUFFER_Status_Success )
-            {
-                Status = USB_STM32L496VGT6P_Status_Error;
-                break;
-            }
-
-            if ( ( BUFFER_Status = BUFFER_Initialize( &Instance->Interface[ Interface ].Receive, ReceiveContent[ Interface ], UTIL_SizeOf( ReceiveContent[ Interface ] ) ) ) != BUFFER_Status_Success )
-            {
-                Status = USB_STM32L496VGT6P_Status_Error;
-                break;
-            }
         }
 
         Instance->Event = USB_STM32L496VGT6P_Event_None;
@@ -1111,7 +1129,7 @@ USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Read( USB_STM32L496VGT6P_t USBx, 
 // #### Public Variable(s) #####################################################
 // #############################################################################
 
-const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260604-0241";
+const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260604-1610";
 
 // #############################################################################
 // #### File Guard #############################################################
