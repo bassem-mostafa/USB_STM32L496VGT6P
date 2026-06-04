@@ -242,7 +242,22 @@ static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_OperationCommitResolve( US
 // #### Private Variable(s) ####################################################
 // #############################################################################
 
-static USB_STM32L496VGT6P_Context_t USB_STM32L496VGT6P_Context;
+extern uint8_t UserTxBuffer0[ APP_TX_DATA_SIZE ];
+extern uint8_t UserRxBuffer0[ APP_RX_DATA_SIZE ];
+extern uint8_t UserTxBuffer1[ APP_TX_DATA_SIZE ];
+extern uint8_t UserRxBuffer1[ APP_RX_DATA_SIZE ];
+static USB_STM32L496VGT6P_Context_t USB_STM32L496VGT6P_Context = {
+    .Instance[ USB_STM32L496VGT6P_1 ] = {
+        .Interface[ USB_STM32L496VGT6P_Interface_1 ] = {
+            .BUFFER_INITIALIZE( Transmit, UserTxBuffer0, APP_TX_DATA_SIZE ),
+            .BUFFER_INITIALIZE( Receive, UserRxBuffer0, APP_RX_DATA_SIZE ),
+        },
+        .Interface[ USB_STM32L496VGT6P_Interface_2 ] = {
+            .BUFFER_INITIALIZE( Transmit, UserTxBuffer1, APP_TX_DATA_SIZE ),
+            .BUFFER_INITIALIZE( Receive, UserRxBuffer1, APP_RX_DATA_SIZE ),
+        },
+    },
+};
 
 // #############################################################################
 // #### Private Method(s) ######################################################
@@ -1129,7 +1144,7 @@ USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Read( USB_STM32L496VGT6P_t USBx, 
 // #### Public Variable(s) #####################################################
 // #############################################################################
 
-const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260604-1845";
+const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260605-0019";
 
 // #############################################################################
 // #### File Guard #############################################################
