@@ -227,10 +227,6 @@ static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Context_Initialize( void )
 static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Context_Cycle( void );
 static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Context_DeInitialize( void );
 
-static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Instance_Initialize( USB_STM32L496VGT6P_t USBx );
-static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Instance_Cycle( USB_STM32L496VGT6P_t USBx );
-static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Instance_DeInitialize( USB_STM32L496VGT6P_t USBx );
-
 static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_SetProcess( USB_STM32L496VGT6P_t USBx, USB_STM32L496VGT6P_ProcessType_t ProcessType );
 
 static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_ProcessInitialize( USB_STM32L496VGT6P_t USBx );
@@ -582,249 +578,6 @@ static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Context_DeInitialize( void
     return Status;
 }
 
-static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Instance_Initialize( USB_STM32L496VGT6P_t USBx )
-{
-    USB_STM32L496VGT6P_Status_t Status = USB_STM32L496VGT6P_Status_Success;
-    GPIO_Status_t GPIO_Status = GPIO_Status_Success;
-
-    do
-    {
-        USB_Trace( "%s( USBx=%d )", __FUNCTION__, USBx );
-
-        USB_STM32L496VGT6P_Instance_t * Instance = &USB_STM32L496VGT6P_Context.Instance[ USBx ];
-
-        switch ( USBx )
-        {
-            case USB_STM32L496VGT6P_1:
-                // TODO Configure GPIOs
-                if ( ( GPIO_Status = GPIO_Configure( Instance->VBUS_Sense, ( GPIO_Configuration_t ) {
-                                                                               .Mode = GPIO_Mode_Interrupt,
-                                                                               .Function = GPIO_Function_Default, // FIXME Should be GPIO_Function_USB_VSENSE
-                                                                               .Pull = GPIO_Pull_None,
-                                                                           } ) )
-                     != GPIO_Status_Success )
-                {
-                    Status = USB_Status_Error;
-                    break;
-                }
-
-                if ( ( GPIO_Status = GPIO_SetOnInterrupt( Instance->VBUS_Sense, ( GPIO_OnInterrupt_t ) { .Callback = GPIO_CallbackOnInterrupt, .Context = Instance } ) ) != GPIO_Status_Success )
-                {
-                    Status = USB_Status_Error;
-                    break;
-                }
-                break;
-
-            default:
-                Status = USB_STM32L496VGT6P_Status_NotSupported;
-                break;
-        }
-        if ( Status != USB_STM32L496VGT6P_Status_Success )
-        {
-            break;
-        }
-
-        Instance->Event = USB_STM32L496VGT6P_Event_None;
-
-        Status = USB_STM32L496VGT6P_SetProcess( USBx, USB_STM32L496VGT6P_ProcessType_Initialize );
-    }
-    while ( 0 );
-
-    return Status;
-}
-
-static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Instance_Cycle( USB_STM32L496VGT6P_t USBx )
-{
-    USB_STM32L496VGT6P_Status_t Status = USB_STM32L496VGT6P_Status_Success;
-    USB_STM32L496VGT6P_Status_t STM32L496VGT6P_Status = USB_STM32L496VGT6P_Status_Success;
-
-    do
-    {
-        USB_Trace( "%s( USBx=%d )", __FUNCTION__, USBx );
-
-        USB_STM32L496VGT6P_Instance_t * Instance = &USB_STM32L496VGT6P_Context.Instance[ USBx ];
-
-        USB_STM32L496VGT6P_Process_t * Process = &Instance->Process;
-        USB_STM32L496VGT6P_Operation_t * Operation = &Process->Context.Operation;
-        USB_STM32L496VGT6P_Event_t Event = Instance->Event; // CAUTION: Has to copy events occurred at the early start of the cycle, so as to be cleared at the end of the cycle,
-                                                            //          which let events occurs after that for the next cycle call
-        Instance->Event &= ~Event;                          //          Clear captured events
-
-        if ( Operation->Handler != NULL )
-        {
-            if ( ( STM32L496VGT6P_Status = Operation->Handler( USBx ) ) != USB_STM32L496VGT6P_Status_Success )
-            {
-                Status = STM32L496VGT6P_Status;
-                // FIXME Operation reported non success status, is there any action ?
-            }
-        }
-
-        if ( Process->Handler != NULL )
-        {
-            if ( ( STM32L496VGT6P_Status = Process->Handler( USBx ) ) != USB_STM32L496VGT6P_Status_Success )
-            {
-                Status = STM32L496VGT6P_Status;
-                // FIXME Process reported non success status, is there any action ?
-            }
-        }
-
-        if ( ( Event & USB_STM32L496VGT6P_Event_Interrupt ) == USB_STM32L496VGT6P_Event_Interrupt )
-        {
-            Event &= ~USB_STM32L496VGT6P_Event_Interrupt;
-            USB_Trace( "Interrupt: USBx=%d", USBx );
-            // TODO Invoke Callback
-        }
-
-        if ( ( Event & USB_STM32L496VGT6P_Event_Connected ) == USB_STM32L496VGT6P_Event_Connected )
-        {
-            Event &= ~USB_STM32L496VGT6P_Event_Connected;
-            USB_Debug( "Connected: USBx=%d", USBx );
-            // TODO Invoke Callback
-        }
-
-        if ( ( Event & USB_STM32L496VGT6P_Event_Disconnected ) == USB_STM32L496VGT6P_Event_Disconnected )
-        {
-            Event &= ~USB_STM32L496VGT6P_Event_Disconnected;
-            USB_Debug( "DisConnected: USBx=%d", USBx );
-            // TODO Invoke Callback
-        }
-
-        if ( ( Event & USB_STM32L496VGT6P_Event_StartOfFrame ) == USB_STM32L496VGT6P_Event_StartOfFrame )
-        {
-            Event &= ~USB_STM32L496VGT6P_Event_StartOfFrame;
-            USB_Debug( "Start Of Frame: USBx=%d", USBx );
-            // TODO Invoke Callback
-        }
-
-        if ( ( Event & USB_STM32L496VGT6P_Event_Setup ) == USB_STM32L496VGT6P_Event_Setup )
-        {
-            Event &= ~USB_STM32L496VGT6P_Event_Setup;
-            USB_Debug( "Setup: USBx=%d", USBx );
-            // TODO Invoke Callback
-        }
-
-        if ( ( Event & USB_STM32L496VGT6P_Event_Reset ) == USB_STM32L496VGT6P_Event_Reset )
-        {
-            Event &= ~USB_STM32L496VGT6P_Event_Reset;
-            USB_Debug( "Reset: USBx=%d", USBx );
-            // TODO Invoke Callback
-        }
-
-        if ( ( Event & USB_STM32L496VGT6P_Event_Suspend ) == USB_STM32L496VGT6P_Event_Suspend )
-        {
-            Event &= ~USB_STM32L496VGT6P_Event_Suspend;
-            USB_Debug( "Suspend: USBx=%d", USBx );
-            // TODO Invoke Callback
-        }
-
-        if ( ( Event & USB_STM32L496VGT6P_Event_Resume ) == USB_STM32L496VGT6P_Event_Resume )
-        {
-            Event &= ~USB_STM32L496VGT6P_Event_Resume;
-            USB_Debug( "Resume: USBx=%d", USBx );
-            // TODO Invoke Callback
-        }
-
-        if ( ( Event & USB_STM32L496VGT6P_Event_Tx ) == USB_STM32L496VGT6P_Event_Tx )
-        {
-            Event &= ~USB_STM32L496VGT6P_Event_Tx;
-            USB_Debug( "TX InProgress: USBx=%d", USBx );
-            // TODO Invoke Callback
-        }
-
-        if ( ( Event & USB_STM32L496VGT6P_Event_Rx ) == USB_STM32L496VGT6P_Event_Rx )
-        {
-            Event &= ~USB_STM32L496VGT6P_Event_Rx;
-            USB_Debug( "RX InProgress: USBx=%d", USBx );
-            // TODO Invoke Callback
-        }
-
-        if ( ( Event & USB_STM32L496VGT6P_Event_TxComplete ) == USB_STM32L496VGT6P_Event_TxComplete )
-        {
-            Event &= ~USB_STM32L496VGT6P_Event_TxComplete;
-            USB_Debug( "TX Complete: USBx=%d", USBx );
-            // TODO Invoke Callback
-        }
-
-        if ( ( Event & USB_STM32L496VGT6P_Event_RxComplete ) == USB_STM32L496VGT6P_Event_RxComplete )
-        {
-            Event &= ~USB_STM32L496VGT6P_Event_RxComplete;
-            USB_Debug( "RX Complete: USBx=%d", USBx );
-            // TODO Invoke Callback
-        }
-
-        if ( ( Event & USB_STM32L496VGT6P_Event_TxIncomplete ) == USB_STM32L496VGT6P_Event_TxIncomplete )
-        {
-            Event &= ~USB_STM32L496VGT6P_Event_TxIncomplete;
-            USB_Debug( "TX Incomplete: USBx=%d", USBx );
-            // TODO Invoke Callback
-        }
-
-        if ( ( Event & USB_STM32L496VGT6P_Event_RxIncomplete ) == USB_STM32L496VGT6P_Event_RxIncomplete )
-        {
-            Event &= ~USB_STM32L496VGT6P_Event_RxIncomplete;
-            USB_Debug( "RX Incomplete: USBx=%d", USBx );
-            // TODO Invoke Callback
-        }
-
-        if ( ( Event & USB_STM32L496VGT6P_Event_DataTerminalReady_Enabled ) == USB_STM32L496VGT6P_Event_DataTerminalReady_Enabled )
-        {
-            Event &= ~USB_STM32L496VGT6P_Event_DataTerminalReady_Enabled;
-            USB_Debug( "DTR Enabled: USBx=%d", USBx );
-            // TODO Invoke Callback
-        }
-
-        if ( ( Event & USB_STM32L496VGT6P_Event_DataTerminalReady_Disabled ) == USB_STM32L496VGT6P_Event_DataTerminalReady_Disabled )
-        {
-            Event &= ~USB_STM32L496VGT6P_Event_DataTerminalReady_Disabled;
-            USB_Debug( "DTR Disabled: USBx=%d", USBx );
-            // TODO Invoke Callback
-        }
-
-        if ( Event )
-        {
-            USB_Warning( "Not handled events %X: USBx=%d", Event, USBx );
-        }
-
-        for ( USB_STM32L496VGT6P_Interface_t Interface = USB_STM32L496VGT6P_Interface_1; Interface < USB_STM32L496VGT6P_Interface_Count; ++Interface )
-        {
-            USB_STM32L496VGT6P_InterfaceContext_t * InterfaceContext = &Instance->Interface[ Interface ];
-            BUFFER_t * Transmit = &InterfaceContext->Transmit;
-
-            if ( Transmit->Length < 1 || InterfaceContext->DataTerminalReady != USB_STM32L496VGT6P_DataTerminalReady_Enabled )
-            {
-                continue;
-            }
-
-            USBD_StatusTypeDef USBD_Status = USBD_OK;
-            if ( ( USBD_Status = CDC_Transmit_FS( Transmit->Content, Transmit->Length, Interface ) ) != USBD_OK )
-            {
-                Status = USB_STM32L496VGT6P_Status_Error;
-            }
-        }
-    }
-    while ( 0 );
-
-    return Status;
-}
-
-static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Instance_DeInitialize( USB_STM32L496VGT6P_t USBx )
-{
-    USB_STM32L496VGT6P_Status_t Status = USB_STM32L496VGT6P_Status_Success;
-    do
-    {
-        USB_Trace( "%s( USBx=%d )", __FUNCTION__, USBx );
-
-        USB_STM32L496VGT6P_Instance_t * Instance = &USB_STM32L496VGT6P_Context.Instance[ USBx ];
-
-        UTIL_UNUSED( Instance );
-
-        // FIXME
-        Status = USB_STM32L496VGT6P_Status_NotSupported;
-    }
-    while ( 0 );
-    return Status;
-}
-
 static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_SetProcess( USB_STM32L496VGT6P_t USBx, USB_STM32L496VGT6P_ProcessType_t ProcessType )
 {
     USB_STM32L496VGT6P_Status_t Status = USB_STM32L496VGT6P_Status_Success;
@@ -1009,6 +762,7 @@ static USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_OperationCommitResolve( US
 USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Initialize( USB_STM32L496VGT6P_t USBx )
 {
     USB_STM32L496VGT6P_Status_t Status = USB_STM32L496VGT6P_Status_Success;
+    GPIO_Status_t GPIO_Status = GPIO_Status_Success;
 
     do
     {
@@ -1019,10 +773,42 @@ USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Initialize( USB_STM32L496VGT6P_t 
             break;
         }
 
-        if ( ( Status = USB_STM32L496VGT6P_Instance_Initialize( USBx ) ) != USB_STM32L496VGT6P_Status_Success )
+        USB_STM32L496VGT6P_Instance_t * Instance = &USB_STM32L496VGT6P_Context.Instance[ USBx ];
+
+        switch ( USBx )
+        {
+            case USB_STM32L496VGT6P_1:
+                // TODO Configure GPIOs
+                if ( ( GPIO_Status = GPIO_Configure( Instance->VBUS_Sense, ( GPIO_Configuration_t ) {
+                                                                               .Mode = GPIO_Mode_Interrupt,
+                                                                               .Function = GPIO_Function_Default, // FIXME Should be GPIO_Function_USB_VSENSE
+                                                                               .Pull = GPIO_Pull_None,
+                                                                           } ) )
+                     != GPIO_Status_Success )
+                {
+                    Status = USB_Status_Error;
+                    break;
+                }
+
+                if ( ( GPIO_Status = GPIO_SetOnInterrupt( Instance->VBUS_Sense, ( GPIO_OnInterrupt_t ) { .Callback = GPIO_CallbackOnInterrupt, .Context = Instance } ) ) != GPIO_Status_Success )
+                {
+                    Status = USB_Status_Error;
+                    break;
+                }
+                break;
+
+            default:
+                Status = USB_STM32L496VGT6P_Status_NotSupported;
+                break;
+        }
+        if ( Status != USB_STM32L496VGT6P_Status_Success )
         {
             break;
         }
+
+        Instance->Event = USB_STM32L496VGT6P_Event_None;
+
+        Status = USB_STM32L496VGT6P_SetProcess( USBx, USB_STM32L496VGT6P_ProcessType_Initialize );
     }
     while ( 0 );
 
@@ -1042,9 +828,162 @@ USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Cycle( USB_STM32L496VGT6P_t USBx 
             break;
         }
 
-        if ( ( Status = USB_STM32L496VGT6P_Instance_Cycle( USBx ) ) != USB_STM32L496VGT6P_Status_Success )
+        USB_STM32L496VGT6P_Instance_t * Instance = &USB_STM32L496VGT6P_Context.Instance[ USBx ];
+
+        USB_STM32L496VGT6P_Process_t * Process = &Instance->Process;
+        USB_STM32L496VGT6P_Operation_t * Operation = &Process->Context.Operation;
+        USB_STM32L496VGT6P_Event_t Event = Instance->Event; // CAUTION: Has to copy events occurred at the early start of the cycle, so as to be cleared at the end of the cycle,
+                                                            //          which let events occurs after that for the next cycle call
+        Instance->Event &= ~Event;                          //          Clear captured events
+
+        if ( Operation->Handler != NULL )
         {
-            break;
+            if ( ( Status = Operation->Handler( USBx ) ) != USB_STM32L496VGT6P_Status_Success )
+            {
+                // FIXME Operation reported non success status, is there any action ?
+            }
+        }
+
+        if ( Process->Handler != NULL )
+        {
+            if ( ( Status = Process->Handler( USBx ) ) != USB_STM32L496VGT6P_Status_Success )
+            {
+                // FIXME Process reported non success status, is there any action ?
+            }
+        }
+
+        if ( ( Event & USB_STM32L496VGT6P_Event_Interrupt ) == USB_STM32L496VGT6P_Event_Interrupt )
+        {
+            Event &= ~USB_STM32L496VGT6P_Event_Interrupt;
+            USB_Trace( "Interrupt: USBx=%d", USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Event & USB_STM32L496VGT6P_Event_Connected ) == USB_STM32L496VGT6P_Event_Connected )
+        {
+            Event &= ~USB_STM32L496VGT6P_Event_Connected;
+            USB_Debug( "Connected: USBx=%d", USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Event & USB_STM32L496VGT6P_Event_Disconnected ) == USB_STM32L496VGT6P_Event_Disconnected )
+        {
+            Event &= ~USB_STM32L496VGT6P_Event_Disconnected;
+            USB_Debug( "DisConnected: USBx=%d", USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Event & USB_STM32L496VGT6P_Event_StartOfFrame ) == USB_STM32L496VGT6P_Event_StartOfFrame )
+        {
+            Event &= ~USB_STM32L496VGT6P_Event_StartOfFrame;
+            USB_Debug( "Start Of Frame: USBx=%d", USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Event & USB_STM32L496VGT6P_Event_Setup ) == USB_STM32L496VGT6P_Event_Setup )
+        {
+            Event &= ~USB_STM32L496VGT6P_Event_Setup;
+            USB_Debug( "Setup: USBx=%d", USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Event & USB_STM32L496VGT6P_Event_Reset ) == USB_STM32L496VGT6P_Event_Reset )
+        {
+            Event &= ~USB_STM32L496VGT6P_Event_Reset;
+            USB_Debug( "Reset: USBx=%d", USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Event & USB_STM32L496VGT6P_Event_Suspend ) == USB_STM32L496VGT6P_Event_Suspend )
+        {
+            Event &= ~USB_STM32L496VGT6P_Event_Suspend;
+            USB_Debug( "Suspend: USBx=%d", USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Event & USB_STM32L496VGT6P_Event_Resume ) == USB_STM32L496VGT6P_Event_Resume )
+        {
+            Event &= ~USB_STM32L496VGT6P_Event_Resume;
+            USB_Debug( "Resume: USBx=%d", USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Event & USB_STM32L496VGT6P_Event_Tx ) == USB_STM32L496VGT6P_Event_Tx )
+        {
+            Event &= ~USB_STM32L496VGT6P_Event_Tx;
+            USB_Debug( "TX InProgress: USBx=%d", USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Event & USB_STM32L496VGT6P_Event_Rx ) == USB_STM32L496VGT6P_Event_Rx )
+        {
+            Event &= ~USB_STM32L496VGT6P_Event_Rx;
+            USB_Debug( "RX InProgress: USBx=%d", USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Event & USB_STM32L496VGT6P_Event_TxComplete ) == USB_STM32L496VGT6P_Event_TxComplete )
+        {
+            Event &= ~USB_STM32L496VGT6P_Event_TxComplete;
+            USB_Debug( "TX Complete: USBx=%d", USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Event & USB_STM32L496VGT6P_Event_RxComplete ) == USB_STM32L496VGT6P_Event_RxComplete )
+        {
+            Event &= ~USB_STM32L496VGT6P_Event_RxComplete;
+            USB_Debug( "RX Complete: USBx=%d", USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Event & USB_STM32L496VGT6P_Event_TxIncomplete ) == USB_STM32L496VGT6P_Event_TxIncomplete )
+        {
+            Event &= ~USB_STM32L496VGT6P_Event_TxIncomplete;
+            USB_Debug( "TX Incomplete: USBx=%d", USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Event & USB_STM32L496VGT6P_Event_RxIncomplete ) == USB_STM32L496VGT6P_Event_RxIncomplete )
+        {
+            Event &= ~USB_STM32L496VGT6P_Event_RxIncomplete;
+            USB_Debug( "RX Incomplete: USBx=%d", USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Event & USB_STM32L496VGT6P_Event_DataTerminalReady_Enabled ) == USB_STM32L496VGT6P_Event_DataTerminalReady_Enabled )
+        {
+            Event &= ~USB_STM32L496VGT6P_Event_DataTerminalReady_Enabled;
+            USB_Debug( "DTR Enabled: USBx=%d", USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( ( Event & USB_STM32L496VGT6P_Event_DataTerminalReady_Disabled ) == USB_STM32L496VGT6P_Event_DataTerminalReady_Disabled )
+        {
+            Event &= ~USB_STM32L496VGT6P_Event_DataTerminalReady_Disabled;
+            USB_Debug( "DTR Disabled: USBx=%d", USBx );
+            // TODO Invoke Callback
+        }
+
+        if ( Event )
+        {
+            USB_Warning( "Not handled events %X: USBx=%d", Event, USBx );
+        }
+
+        for ( USB_STM32L496VGT6P_Interface_t Interface = USB_STM32L496VGT6P_Interface_1; Interface < USB_STM32L496VGT6P_Interface_Count; ++Interface )
+        {
+            USB_STM32L496VGT6P_InterfaceContext_t * InterfaceContext = &Instance->Interface[ Interface ];
+            BUFFER_t * Transmit = &InterfaceContext->Transmit;
+
+            if ( Transmit->Length < 1 || InterfaceContext->DataTerminalReady != USB_STM32L496VGT6P_DataTerminalReady_Enabled )
+            {
+                continue;
+            }
+
+            USBD_StatusTypeDef USBD_Status = USBD_OK;
+            if ( ( USBD_Status = CDC_Transmit_FS( Transmit->Content, Transmit->Length, Interface ) ) != USBD_OK )
+            {
+                Status = USB_STM32L496VGT6P_Status_Error;
+            }
         }
     }
     while ( 0 );
@@ -1060,15 +999,17 @@ USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_DeInitialize( USB_STM32L496VGT6P_
     {
         USB_Trace( "%s( USBx=%d )", __FUNCTION__, USBx );
 
-        if ( ( Status = USB_STM32L496VGT6P_Instance_DeInitialize( USBx ) ) != USB_STM32L496VGT6P_Status_Success )
-        {
-            break;
-        }
+        USB_STM32L496VGT6P_Instance_t * Instance = &USB_STM32L496VGT6P_Context.Instance[ USBx ];
+
+        UTIL_UNUSED( Instance );
 
         if ( ( Status = USB_STM32L496VGT6P_Context_DeInitialize( ) ) != USB_STM32L496VGT6P_Status_Success )
         {
             break;
         }
+
+        // FIXME
+        Status = USB_STM32L496VGT6P_Status_NotSupported;
     }
     while ( 0 );
 
@@ -1150,7 +1091,7 @@ USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Read( USB_STM32L496VGT6P_t USBx, 
 // #### Public Variable(s) #####################################################
 // #############################################################################
 
-const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260818-0345";
+const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260913-1832";
 
 // #############################################################################
 // #### File Guard #############################################################
