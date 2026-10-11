@@ -288,7 +288,7 @@ void USB_STM32L496VGT6P_RxCpltCallback( uint8_t * pbuf, uint32_t * Len, uint8_t 
 
     Instance->Event |= USB_STM32L496VGT6P_Event_RxComplete;
 
-    if ( ( BUFFER_Status = BUFFER_PushMemoryBackCircular( &Instance->Interface[ Interface ].Receive, pbuf, *Len ) ) != BUFFER_Status_Success )
+    if ( ( BUFFER_Status = BUFFER_PushMemoryBack( &Instance->Interface[ Interface ].Receive, pbuf, *Len ) ) != BUFFER_Status_Success )
     {
         USB_Warning( "%s: %s", __FUNCTION__, "Receive Buffer FULL!" );
     }
@@ -1077,7 +1077,7 @@ USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Read( USB_STM32L496VGT6P_t USBx, 
 
         USB_STM32L496VGT6P_Instance_t * Instance = &USB_STM32L496VGT6P_Context.Instance[ USBx ];
 
-        if ( ( BUFFER_Status = BUFFER_PullMemoryFrontCircular( &Instance->Interface[ Interface ].Receive, Data, DataLength ) ) != BUFFER_Status_Success )
+        if ( ( BUFFER_Status = BUFFER_PullMemoryFront( &Instance->Interface[ Interface ].Receive, Data, DataLength ) ) != BUFFER_Status_Success )
         {
             Status = USB_STM32L496VGT6P_Status_Error;
             break;
@@ -1091,7 +1091,7 @@ USB_STM32L496VGT6P_Status_t USB_STM32L496VGT6P_Read( USB_STM32L496VGT6P_t USBx, 
 // #### Public Variable(s) #####################################################
 // #############################################################################
 
-const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20260913-1832";
+const char USB_STM32L496VGT6P_VERSION[] = "0.0.0.v20261012-0036";
 
 // #############################################################################
 // #### File Guard #############################################################
